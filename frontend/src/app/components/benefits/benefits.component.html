@@ -1,0 +1,155 @@
+<div class="container">
+    <header class="header">
+        <h1>Gestão de Benefícios</h1>
+        <button class="btn btn-primary" (click)="openCreateForm()">
+            + Novo Benefício
+        </button>
+    </header>
+
+    @if (error()) {
+        <div class="alert alert-error">
+            {{ error() }}
+            <button class="btn-close" (click)="error.set(null)">×</button>
+        </div>
+    }
+
+    @if (isLoading()) {
+        <div class="loading">Carregando...</div>
+    } @else {
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Descrição</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+                </thead>
+                <tbody>
+                    @for (benefit of benefits(); track benefit.id) {
+                        <tr>
+                            <td>{{ benefit.id }}</td>
+                            <td>{{ benefit.nome }}</td>
+                            <td>{{ benefit.descricao }}</td>
+                            <td>{{ benefit.valor | currency:'BRL' }}</td>
+                            <td>
+                <span class="badge" [class.badge-success]="benefit.ativo" [class.badge-danger]="!benefit.ativo">
+                  {{ benefit.ativo ? 'Ativo' : 'Inativo' }}
+                </span>
+                            </td>
+                            <td class="actions">
+                                <button class="btn btn-sm btn-secondary" (click)="openEditForm(benefit)">Editar</button>
+                                <button class="btn btn-sm btn-info" (click)="openTransferDialog(benefit)">Transferir</button>
+                                <button class="btn btn-sm btn-danger" (click)="openDeleteDialog(benefit)">Excluir</button>
+                            </td>
+                        </tr>
+                    } @empty {
+                        <tr>
+                            <td colspan="6" class="empty">Nenhum benefício encontrado</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginação -->
+        <div class="pagination">
+            <button class="btn btn-sm" [disabled]="currentPage() === 0" (click)="goToPage(currentPage() - 1)">
+                Anterior
+            </button>
+
+            @for (page of pages; track page) {
+                <button
+                        class="btn btn-sm"
+                        [class.btn-primary]="page === currentPage()"
+                        (click)="goToPage(page)">
+                    {{ page + 1 }}
+                </button>
+            }
+
+            <button class="btn btn-sm" [disabled]="currentPage() >= totalPages() - 1" (click)="goToPage(currentPage() + 1)">
+                Próximo
+            </button>
+
+            <span class="pagination-info">
+        Total: {{ totalElements() }} registros
+      </span>
+        </div>
+    }
+
+    <!-- Modal Formulário -->
+    @if (isFormOpen()) {
+        <div class="modal-overlay" (click)="closeForm()">
+            <div class="modal" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>{{ selectedBenefit() ? 'Editar' : 'Novo' }} Benefício</h2>
+                    <button class="btn-close" (click)="closeForm()">×</button>
+                </div>
+                <app-benefit-form
+                        [benefit]="selectedBenefit()"
+                        (submitForm)="onFormSubmit($event)"
+                        (cancel)="closeForm()">
+                </app-benefit-form>
+            </div>
+        </div>
+    }
+
+    <!-- Modal Exclusão -->
+    @if (isDeleteDialogOpen()) {
+        <div class="modal-overlay" (click)="closeDeleteDialog()">
+            <div class="modal modal-sm" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>Confirmar Exclusão</h2>
+                    <button class="btn-close" (click)="closeDeleteDialog()">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Tem certeza que deseja excluir o benefício <strong>{{ selectedBenefit()?.nome }}</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" (click)="closeDeleteDialog()">Cancelar</button>
+                    <button class="btn btn-danger" (click)="confirmDelete()">Excluir</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal Transferência -->
+    @if (isTransferDialogOpen()) {
+        <div class="modal-overlay" (click)="closeTransferDialog()">
+            <div class="modal modal-sm" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>Transferir Benefício</h2>
+                    <button class="btn-close" (click)="closeTransferDialog()">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Transferir <strong>{{ selectedBenefit()?.nome }}</strong> para:</p>
+                    <select class="form-control" (change)="selectedUserId.set(+$any($event.target).value)">
+                        <option value="">Selecione um usuário</option>
+                        @for (user of filteredBenefits(); track user.id) {
+                            <option [value]="user.id">{{ user.nome }}</option>
+                        }
+                    </select>
+
+                    <label class="form-label">Valor da transferência</label>
+                    <input class="form-control"
+                           type="number"
+                           min="0.01"
+                           step="0.01"
+                           [value]="transferAmount() ?? ''"
+                           (input)="transferAmount.set(+$any($event.target).value)" />
+
+                    @if (transferAmountError()) {
+                        <small class="text-danger">{{ transferAmountError() }}</small>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" (click)="closeTransferDialog()">Cancelar</button>
+                    <button class="btn btn-primary" [disabled]="!selectedUserId() || isTransferAmountInvalid()" (click)="confirmTransfer()">Transferir</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>

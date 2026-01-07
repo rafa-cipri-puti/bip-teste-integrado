@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: beneficios
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U app -d beneficios" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  wildfly:
+    build:
+      context: .
+      dockerfile: ejb-module/Dockerfile
+    container_name: wildfly
+    environment:
+      JAVA_TOOL_OPTIONS: "-Djboss.server.config.history=false"
+      EJB_USER: ejbuser
+      EJB_PASS: ejbpass
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: beneficios
+      DB_USER: app
+      DB_PASS: app
+    ports:
+      - "8081:8080"
+      - "9990:9990"
+      - "4447:4447"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend-module/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/beneficios
+      SPRING_DATASOURCE_USERNAME: app
+      SPRING_DATASOURCE_PASSWORD: app
+      EJB_PROVIDER_URL: http-remoting://wildfly:8080
+      EJB_JNDI_NAME: app/com.example-ejb-module-0.0.1-SNAPSHOT/BeneficioEjbServiceImpl!com.example.ejb.service.BeneficioEjbService
+      EJB_USERNAME: ejbuser
+      EJB_PASSWORD: ejbpass
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wildfly:
+        condition: service_started
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fs http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:

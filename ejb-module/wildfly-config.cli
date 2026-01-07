@@ -1,0 +1,26 @@
+embed-server --std-out=echo --server-config=standalone.xml
+
+module add \
+  --name=org.postgresql \
+  --resources=/opt/jboss/wildfly/custom/postgres/postgresql.jar \
+  --dependencies=javaee.api,jakarta.transaction.api
+
+/subsystem=datasources/jdbc-driver=postgresql:add( \
+  driver-name=postgresql, \
+  driver-module-name=org.postgresql, \
+  driver-class-name=org.postgresql.Driver \
+)
+
+data-source add \
+  --name=BeneficioDS \
+  --jndi-name=java:/jdbc/BeneficioDS \
+  --driver-name=postgresql \
+  --connection-url=jdbc:postgresql://${env.DB_HOST:db}:${env.DB_PORT:5432}/${env.DB_NAME:beneficio} \
+  --user-name=${env.DB_USER:beneficio} \
+  --password=${env.DB_PASS:beneficio} \
+  --use-ccm=true \
+  --min-pool-size=2 \
+  --max-pool-size=20 \
+  --enabled=true
+
+stop-embedded-server
